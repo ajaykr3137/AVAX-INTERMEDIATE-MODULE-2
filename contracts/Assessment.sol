@@ -1,60 +1,54 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.9;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
-//import "hardhat/console.sol";
+contract EventTicketing {
+    address public owner;
+    uint256 public ticketPrice;
+    uint256 public totalTickets;
+    uint256 public remainingTickets;
+    mapping(address => uint256) public ticketsOwned;
 
-contract Assessment {
-    address payable public owner;
-    uint256 public balance;
+    event TicketsPurchased(address indexed buyer, uint256 quantity);
+    event TicketTransferred(address indexed from, address indexed to, uint256 quantity);
 
-    event Deposit(uint256 amount);
-    event Withdraw(uint256 amount);
-
-    constructor(uint initBalance) payable {
-        owner = payable(msg.sender);
-        balance = initBalance;
+    constructor(uint256 _ticketPrice, uint256 _totalTickets) {
+        owner = msg.sender;
+        ticketPrice = _ticketPrice;
+        totalTickets = _totalTickets;
+        remainingTickets = _totalTickets;
     }
 
-    function getBalance() public view returns(uint256){
-        return balance;
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not authorized");
+        _;
     }
 
-    function deposit(uint256 _amount) public payable {
-        uint _previousBalance = balance;
+    function buyTicket() external payable {
+        uint256 quantity = msg.value / ticketPrice;
+        require(quantity > 0, "Insufficient funds for ticket");
+        require(remainingTickets >= quantity, "Not enough tickets available");
 
-        // make sure this is the owner
-        require(msg.sender == owner, "You are not the owner of this account");
+        ticketsOwned[msg.sender] += quantity;
+        remainingTickets -= quantity;
 
-        // perform transaction
-        balance += _amount;
-
-        // assert transaction completed successfully
-        assert(balance == _previousBalance + _amount);
-
-        // emit the event
-        emit Deposit(_amount);
+        emit TicketsPurchased(msg.sender, quantity);
     }
 
-    // custom error
-    error InsufficientBalance(uint256 balance, uint256 withdrawAmount);
+    function transferTicket(address _to, uint256 _quantity) external {
+        require(ticketsOwned[msg.sender] >= _quantity, "Insufficient tickets");
+        require(_to != address(0), "Invalid address");
 
-    function withdraw(uint256 _withdrawAmount) public {
-        require(msg.sender == owner, "You are not the owner of this account");
-        uint _previousBalance = balance;
-        if (balance < _withdrawAmount) {
-            revert InsufficientBalance({
-                balance: balance,
-                withdrawAmount: _withdrawAmount
-            });
-        }
+        ticketsOwned[msg.sender] -= _quantity;
+        ticketsOwned[_to] += _quantity;
 
-        // withdraw the given amount
-        balance -= _withdrawAmount;
+        emit TicketTransferred(msg.sender, _to, _quantity);
+    }
 
-        // assert the balance is correct
-        assert(balance == (_previousBalance - _withdrawAmount));
+    function getRemainingTickets() external view returns (uint256) {
+        return remainingTickets;
+    }
 
-        // emit the event
-        emit Withdraw(_withdrawAmount);
+    function getTicketPrice() external view returns (uint256) {
+        return ticketPrice;
     }
 }
